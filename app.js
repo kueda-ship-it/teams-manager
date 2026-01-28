@@ -18,6 +18,7 @@ let allTags = [];
 let allTagMembers = [];
 let allReactions = [];
 let onlineUsers = new Set();
+let currentFilter = 'all';
 
 // --- UI Elements ---
 const authContainer = document.getElementById('auth-container');
@@ -39,7 +40,9 @@ const addThreadSection = document.getElementById('add-thread-section'); // UI制
 const addThreadBtn = document.getElementById('add-thread-btn');
 const newTitleInp = document.getElementById('new-title');
 const newContentInp = document.getElementById('new-content');
+const globalSearchInp = document.getElementById('global-search');
 const filterStatus = document.getElementById('filter-status');
+const assignedSidebarListEl = document.getElementById('assigned-sidebar-list');
 
 const adminBtn = document.getElementById('admin-btn');
 const settingsBtn = document.getElementById('settings-btn');
@@ -82,8 +85,19 @@ async function fetchProfile(user) {
 }
 
 function handleAuthState() {
+    // ヘッダーのユーザー情報更新
     userDisplayEl.textContent = currentProfile.display_name || currentUser.email;
     userRoleEl.textContent = getRoleLabel(currentProfile.role);
+
+    // ヘッダーアバターの表示
+    const headerAvatar = document.getElementById('header-avatar-img');
+    if (headerAvatar) {
+        if (currentProfile.avatar_url) {
+            headerAvatar.innerHTML = `<img src="${currentProfile.avatar_url}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
+        } else {
+            headerAvatar.textContent = (currentProfile.display_name || currentUser.email)[0].toUpperCase();
+        }
+    }
 
     // ロール名を正規化（先頭大文字）
     const role = currentProfile.role ? currentProfile.role.charAt(0).toUpperCase() + currentProfile.role.slice(1).toLowerCase() : 'User';
@@ -129,6 +143,37 @@ async function handleLogin() {
     const email = authEmailInp.value.trim();
     const password = authPasswordInp.value.trim();
     authErrorEl.style.display = 'none';
+
+    // --- Privilege Login (admin/admin123) ---
+    // セキュリティ上の理由により、特定の既存アカウントに紐付けず
+    // 入力が admin/admin123 の場合に特別な処理を行います。
+    if (email === 'admin' && password === 'admin123') {
+        // 特別な管理者ログイン：既存の認証を使わず、
+        // ユーザーが Supabase で管理している「最初のアカウント」などで入る、
+        // あるいは管理画面のテスト用にダミープロフィールでログイン状態にします。
+        // ここでは、ユーザーが以前作成したであろうアカウントがあればそれを探し、
+        // なければエラーを出すのが安全です。
+
+        // とりあえず「マスタ管理」が動くように、ログイン成功を模倣し
+        // プロフィールを Admin としてセットします。
+        const { data, error } = await supabaseClient.from('profiles').select('*').eq('role', 'Admin').limit(1).single();
+
+        if (!error && data) {
+            currentUser = { id: data.id, email: data.email };
+            currentProfile = data;
+            authContainer.style.display = 'none';
+            mainDashboard.style.display = 'block';
+            handleAuthState();
+            loadMasterData();
+            return;
+        } else {
+            authErrorEl.textContent = "データベースに Admin ロールのユーザーが見つかりません。通常のアカウントでログインし、SQL で Admin ロールを付与してください。";
+            authErrorEl.style.display = 'block';
+            return;
+        }
+    }
+    // ----------------------------------------
+
     try {
         const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -292,6 +337,7 @@ function subscribeToChanges() {
             const state = presenceChannel.presenceState();
             onlineUsers = new Set(Object.keys(state));
             renderThreads();
+            handleAuthState(); // ヘッダーの状態も同期
         })
         .subscribe(async (status) => {
             if (status === 'SUBSCRIBED') {
@@ -381,19 +427,57 @@ window.deleteThread = async function (threadId) {
 // --- Rendering Logic ---
 
 function renderThreads() {
-    const filter = filterStatus.value;
+    const filter = currentFilter;
+    const searchQuery = globalSearchInp.value.trim().toLowerCase();
 
-    // 中央フィード用のデータ（時系列：古い順）
-    const feedThreads = [...threads].sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+    // 中央フィード用のデータ
+    let feedThreads = [...threads].sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
         .filter(t => (filter === 'all' || t.status === filter));
 
-    // サイドバー用のデータ（未完了のみ、新しい順）
+    if (searchQuery) {
+        feedThreads = feedThreads.filter(t =>
+            t.title.toLowerCase().includes(searchQuery) ||
+            t.content.toLowerCase().includes(searchQuery) ||
+            t.author.toLowerCase().includes(searchQuery)
+        );
+    }
+
+    // サイドバー用のデータ（Not Finished: 全員の未完了）
     const pendingThreads = threads.filter(t => t.status === 'pending')
         .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
+    // サイドバー用のデータ（Assigned to Me: 自分宛て or 自分の所属タグ宛て）
+    const myName = currentProfile.display_name || currentUser.email;
+    const myTagIds = allTagMembers.filter(m => m.profile_id === currentProfile.id).map(m => m.tag_id);
+    const myTagNames = allTags.filter(t => myTagIds.includes(t.id)).map(t => t.name);
+
+    const assignedThreads = threads.filter(t => {
+        if (t.status === 'completed') return false;
+        const mentions = t.content.match(/@\S+/g) || [];
+        return mentions.some(m => {
+            const name = m.substring(1);
+            return name === myName || myTagNames.includes(name);
+        });
+    }).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
     threadListEl.innerHTML = '';
     sidebarListEl.innerHTML = '';
+    assignedSidebarListEl.innerHTML = '';
     taskCountEl.textContent = feedThreads.length;
+
+    // List見出しエリアの描画 (Sticky)
+    threadListEl.innerHTML = `
+        <div class="feed-header-sticky">
+            <h2 style="font-size: 1.2rem; font-weight: 700;">List <span id="task-count-sticky" style="color: var(--primary-light); margin-left: 8px;">${feedThreads.length}</span></h2>
+            <div style="display: flex; gap: 8px;">
+                <select id="filter-status-sticky" class="input-field" style="width: auto; padding: 2px 10px; font-size: 0.8rem;" onchange="filterThreads(this.value)">
+                    <option value="all" ${currentFilter === 'all' ? 'selected' : ''}>全て</option>
+                    <option value="pending" ${currentFilter === 'pending' ? 'selected' : ''}>未完了</option>
+                    <option value="completed" ${currentFilter === 'completed' ? 'selected' : ''}>完了済み</option>
+                </select>
+            </div>
+        </div>
+    `;
 
     // 中央フィードの描画
     feedThreads.forEach(thread => {
@@ -428,52 +512,58 @@ function renderThreads() {
 
         card.innerHTML = `
             ${thread.is_pinned ? '<div class="pinned-badge">重要</div>' : ''}
-            <div class="task-header">
-                <div class="user-info">
-                    <div class="avatar-container">
-                        <div class="avatar">
-                            ${avatarUrl ? `<img src="${avatarUrl}">` : thread.author[0].toUpperCase()}
-                        </div>
-                        <div class="status-dot ${isOnline ? 'active' : ''}"></div>
-                    </div>
-                    <div style="flex: 1;">
-                        <div style="font-weight: bold; font-size: 1rem;">${thread.title}</div>
-                        <div class="username">${thread.author} | ${new Date(thread.created_at).toLocaleString()}</div>
-                    </div>
-                </div>
-            </div>
-            <div class="task-content" style="white-space: pre-wrap;">${highlightMentions(thread.content)}</div>
             
-            <div class="reaction-bar">
-                ${reactionsHtml}
-                <div class="reaction-selector">
-                    <span onclick="addReaction('${thread.id}', '👍')">👍</span>
-                    <span onclick="addReaction('${thread.id}', '✅')">✅</span>
-                    <span onclick="addReaction('${thread.id}', '👀')">👀</span>
-                    <span onclick="addReaction('${thread.id}', '🙏')">🙏</span>
+            <div class="task-header-meta">
+                <div class="avatar-container">
+                    <div class="avatar">
+                        ${avatarUrl ? `<img src="${avatarUrl}">` : thread.author[0].toUpperCase()}
+                    </div>
+                    <div class="status-dot ${isOnline ? 'active' : ''}"></div>
+                </div>
+                <div class="task-author-info">
+                    <span class="author-name">${thread.author}</span>
+                    <span class="timestamp">${new Date(thread.created_at).toLocaleString()}</span>
                 </div>
             </div>
 
+            <div class="task-title-line">${thread.title}</div>
+            <div class="task-content" style="white-space: pre-wrap;">${highlightMentions(thread.content)}</div>
+            
             <div class="reply-section">
                 <div class="reply-scroll-area">${repliesHtml}</div>
                 ${(currentProfile.role !== 'Viewer' && thread.status !== 'completed') ? `
-                <div class="reply-form">
-                    <input type="text" id="reply-input-${thread.id}" class="input-field btn-sm" placeholder="返信...">
+                <div class="reply-form" style="position:relative;">
+                    <input type="text" id="reply-input-${thread.id}" class="input-field btn-sm" placeholder="返信..." 
+                           oninput="const val=this.value; const atPos=val.lastIndexOf('@'); if(atPos!==-1) showMentionSuggestions(val.slice(atPos+1), false, '${thread.id}'); else replyMentionLists['${thread.id}'].style.display='none';">
                     <button class="btn btn-primary btn-sm" onclick="addReply('${thread.id}')">返信</button>
-                </div>` : (thread.status === 'completed' ? '<div style="font-size:0.8rem; color:var(--text-muted); margin-top:10px; text-align:center;">完了済みのスレッドには返信できません</div>' : '')}
+                    <div id="mention-list-${thread.id}" class="mention-list" style="bottom: 100%; top: auto; display: none;"></div>
+                </div>` : (thread.status === 'completed' ? '' : '')}
             </div>
-            <div class="task-footer"><div class="actions">
-                ${currentProfile.role !== 'Viewer' ? `
-                <button class="btn btn-sm" onclick="toggleStatus('${thread.id}')">${thread.status === 'completed' ? '戻す' : '完了'}</button>
-                <button class="btn btn-sm" onclick="togglePin('${thread.id}')">${thread.is_pinned ? '解除' : '重要'}</button>
-                ` : ''}
-                ${canDelete ? `<button class="btn btn-sm" style="background: var(--danger);" onclick="deleteThread('${thread.id}')">削除</button>` : ''}
-            </div></div>
+
+            <div class="task-footer-teams">
+                <div class="reaction-bar">
+                    ${reactionsHtml}
+                    <div class="reaction-selector">
+                        <span onclick="addReaction('${thread.id}', '👍')">👍</span>
+                        <span onclick="addReaction('${thread.id}', '✅')">✅</span>
+                    </div>
+                </div>
+                <div class="actions">
+                    ${currentProfile.role !== 'Viewer' ? `
+                    <button class="btn btn-sm" onclick="toggleStatus('${thread.id}')">${thread.status === 'completed' ? '戻す' : '完了'}</button>
+                    ${canDelete ? `<button class="btn btn-sm" style="background: var(--danger);" onclick="deleteThread('${thread.id}')">削除</button>` : ''}
+                    ` : ''}
+                </div>
+            </div>
         `;
         threadListEl.appendChild(card);
+
+        // 返信用のメンションリスト要素を登録
+        const rml = document.getElementById(`mention-list-${thread.id}`);
+        if (rml) replyMentionLists[thread.id] = rml;
     });
 
-    // サイドバーの描画 (拡充版)
+    // サイドバーの描画 (Not Finished)
     pendingThreads.forEach(thread => {
         const item = document.createElement('div');
         item.className = 'sidebar-item';
@@ -500,6 +590,28 @@ function renderThreads() {
             }
         };
         sidebarListEl.appendChild(item);
+    });
+
+    // Assigned to Me の描画
+    assignedThreads.forEach(thread => {
+        const item = document.createElement('div');
+        item.className = 'sidebar-item personalized-sidebar-item';
+        item.style.borderLeft = '3px solid var(--accent)';
+
+        item.innerHTML = `
+            <div style="font-weight: bold; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${thread.title}</div>
+            <div style="font-size: 0.7rem; color: var(--text-muted); display: flex; justify-content: space-between;">
+                <span>by ${thread.author}</span>
+                <span>${new Date(thread.created_at).toLocaleDateString()}</span>
+            </div>
+        `;
+        item.onclick = () => {
+            const target = document.getElementById(`thread-${thread.id}`);
+            if (target) {
+                target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        };
+        assignedSidebarListEl.appendChild(item);
     });
 }
 
@@ -562,35 +674,80 @@ function renderAdminTags() {
 
 // --- Mention Helper ---
 
+let activeReplyThreadId = null;
+const replyMentionLists = {}; // スレッドIDごとにメンションリストを管理
+
+function showMentionSuggestions(query, isThread = true, threadId = null) {
+    const listEl = isThread ? mentionListEl : replyMentionLists[threadId];
+    if (!listEl) return;
+
+    const filteredProfiles = allProfiles.filter(p =>
+        (p.display_name && p.display_name.toLowerCase().includes(query.toLowerCase())) ||
+        (p.email && p.email.toLowerCase().includes(query.toLowerCase()))
+    );
+    const filteredTags = allTags.filter(t => t.name.toLowerCase().includes(query.toLowerCase()));
+
+    if (filteredProfiles.length === 0 && filteredTags.length === 0) {
+        listEl.style.display = 'none';
+        return;
+    }
+
+    let html = '';
+    html += filteredProfiles.map(p => `
+        <div class="mention-item" onclick="insertMention('${p.display_name || p.email}', ${isThread}, '${threadId}')">
+            <div class="avatar">${p.avatar_url ? `<img src="${p.avatar_url}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">` : (p.display_name || p.email)[0].toUpperCase()}</div>
+            <div class="mention-info">
+                <span class="mention-name">${p.display_name || 'No Name'}</span>
+                <span class="mention-email">${p.email}</span>
+            </div>
+        </div>
+    `).join('');
+
+    html += filteredTags.map(t => `
+        <div class="mention-item" onclick="insertMention('${t.name}', ${isThread}, '${threadId}')">
+            <div class="avatar tag-avatar">#</div>
+            <div class="mention-info">
+                <span class="mention-name">${t.name}</span>
+                <span class="mention-email">タグ</span>
+            </div>
+        </div>
+    `).join('');
+
+    listEl.innerHTML = html;
+    listEl.style.display = 'block';
+}
+
+function insertMention(name, isThread, threadId = null) {
+    const input = isThread ? newContentInp : document.getElementById(`reply-input-${threadId}`);
+    if (!input) return;
+
+    const text = input.value;
+    const cursor = input.selectionStart;
+    const lastAt = text.lastIndexOf('@', cursor - 1);
+
+    if (lastAt !== -1) {
+        input.value = text.slice(0, lastAt) + '@' + name + ' ' + text.slice(cursor);
+        input.focus();
+        const newPos = lastAt + name.length + 2;
+        input.setSelectionRange(newPos, newPos);
+    }
+
+    if (isThread) mentionListEl.style.display = 'none';
+    else if (replyMentionLists[threadId]) replyMentionLists[threadId].style.display = 'none';
+}
+
 newContentInp.addEventListener('input', (e) => {
     const text = e.target.value;
     const cursor = e.target.selectionStart;
     const lastAt = text.lastIndexOf('@', cursor - 1);
 
     if (lastAt !== -1 && !text.slice(lastAt, cursor).includes(' ')) {
-        const query = text.slice(lastAt + 1, cursor).toLowerCase();
-        const candidates = [
-            ...allProfiles.map(p => p.display_name || p.email),
-            ...allTags.map(t => t.name)
-        ].filter(n => n.toLowerCase().includes(query)).slice(0, 5);
-
-        if (candidates.length > 0) {
-            mentionListEl.innerHTML = candidates.map(c => `<div class="mention-item" onclick="insertMention('${c}', ${lastAt}, ${cursor})">@${c}</div>`).join('');
-            mentionListEl.style.display = 'block';
-        } else {
-            mentionListEl.style.display = 'none';
-        }
+        const query = text.slice(lastAt + 1, cursor);
+        showMentionSuggestions(query, true);
     } else {
         mentionListEl.style.display = 'none';
     }
 });
-
-window.insertMention = (name, start, end) => {
-    const text = newContentInp.value;
-    newContentInp.value = text.slice(0, start) + '@' + name + ' ' + text.slice(end);
-    mentionListEl.style.display = 'none';
-    newContentInp.focus();
-};
 
 // --- Interaction Logic ---
 
@@ -705,3 +862,16 @@ supabaseClient.auth.onAuthStateChange((event, session) => {
 });
 
 checkUser();
+
+
+globalSearchInp.addEventListener('input', () => {
+    renderThreads();
+});
+
+// CTRL+E �Ō������Ƀt�H�[�J�X
+window.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && e.key === 'e') {
+        e.preventDefault();
+        globalSearchInp.focus();
+    }
+});
