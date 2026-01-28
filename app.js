@@ -32,6 +32,7 @@ const userDisplayEl = document.getElementById('user-display');
 const userRoleEl = document.getElementById('user-role');
 
 const threadListEl = document.getElementById('thread-list');
+const sidebarListEl = document.getElementById('pending-sidebar-list');
 const taskCountEl = document.getElementById('task-count');
 const addThreadSection = document.getElementById('add-thread-section'); // UI制御用
 const addThreadBtn = document.getElementById('add-thread-btn');
@@ -335,15 +336,24 @@ window.deleteThread = async function (threadId) {
 
 function renderThreads() {
     const filter = filterStatus.value;
-    const filtered = threads.filter(t => (filter === 'all' || t.status === filter));
-    threadListEl.innerHTML = '';
-    taskCountEl.textContent = filtered.length;
 
-    filtered.forEach(thread => {
+    // 中央フィード用のデータ（時系列：古い順）
+    const feedThreads = [...threads].sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+        .filter(t => (filter === 'all' || t.status === filter));
+
+    // サイドバー用のデータ（未完了のみ、新しい順）
+    const pendingThreads = threads.filter(t => t.status === 'pending')
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+    threadListEl.innerHTML = '';
+    sidebarListEl.innerHTML = '';
+    taskCountEl.textContent = feedThreads.length;
+
+    // 中央フィードの描画
+    feedThreads.forEach(thread => {
         const card = document.createElement('div');
         card.className = `task-card ${thread.is_pinned ? 'is-pinned' : ''} ${thread.status === 'completed' ? 'is-completed' : ''}`;
 
-        // リアクションの集計表示
         const reactionsForThread = allReactions.filter(r => r.thread_id === thread.id);
         const emojiCounts = reactionsForThread.reduce((acc, r) => {
             acc[r.emoji] = (acc[r.emoji] || 0) + 1;
@@ -404,6 +414,23 @@ function renderThreads() {
             </div></div>
         `;
         threadListEl.appendChild(card);
+    });
+
+    // サイドバーの描画
+    pendingThreads.forEach(thread => {
+        const item = document.createElement('div');
+        item.className = 'sidebar-item';
+        item.innerHTML = `
+            <div style="font-weight: bold; margin-bottom: 4px;">${thread.title}</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); display: flex; justify-content: space-between;">
+                <span>${thread.author}</span>
+                <span>${new Date(thread.created_at).toLocaleDateString()}</span>
+            </div>
+        `;
+        item.onclick = () => {
+            // クリックしたら該当のフィードにスクロール等（オプション）
+        };
+        sidebarListEl.appendChild(item);
     });
 }
 

@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>連絡概要マネージャー | Standalone</title>
+    <title>Contact Team Manager | Standalone</title>
     <link rel="stylesheet" href="style.css">
     <link rel="manifest" href="manifest.json">
     <!-- Supabase JS Library -->
@@ -56,7 +56,7 @@
                     <path d="M11 11H21V21H11V11Z" fill="white" />
                     <path d="M9 13V19C9 20.1046 9.89543 21 11 21H13V11H11C9.89543 11 9 11.8954 9 13Z" fill="#8B8CC7" />
                 </svg>
-                <span>連絡概要マネージャー</span>
+                <span>Contact Team Manager</span>
             </div>
             <div class="user-profile" style="display: flex; align-items: center; gap: 10px;">
                 <button id="admin-btn" class="btn btn-sm"
@@ -71,41 +71,53 @@
             </div>
         </header>
 
-        <main>
-            <!-- New Thread Form -->
-            <section class="form-container">
-                <h3 style="margin-bottom: 1.5rem; font-size: 1.2rem;">新規連絡の作成</h3>
-                <div class="form-group">
-                    <label>タイトル</label>
-                    <input type="text" id="new-title" class="input-field" placeholder="件名を入力...">
+        <div class="dashboard-layout">
+            <main class="main-feed-area">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                    <h2 style="font-size: 1.5rem;">List <span id="task-count"
+                            style="color: var(--primary-light); margin-left: 10px;">0</span></h2>
+                    <div style="display: flex; gap: 10px;">
+                        <select id="filter-status" class="input-field" style="width: auto; padding: 5px 15px;">
+                            <option value="all">全て表示</option>
+                            <option value="pending">未完了のみ</option>
+                            <option value="completed">完了済み</option>
+                        </select>
+                    </div>
                 </div>
-                <div class="form-group" style="position: relative;">
-                    <label>詳細内容 (@でメンション)</label>
-                    <textarea id="new-content" class="input-field" placeholder="連絡内容を入力... @でメンションが可能です"></textarea>
-                    <div id="mention-list" class="mention-list" style="display: none;"></div>
+                <div id="thread-list" class="feed-list">
+                    <!-- Threads will be injected here -->
                 </div>
-                <div style="display: flex; justify-content: flex-end;">
-                    <button id="add-thread-btn" class="btn btn-primary">投稿する</button>
+            </main>
+
+            <aside class="side-panel">
+                <h3
+                    style="font-size: 1rem; margin-bottom: 1rem; color: var(--text-muted); padding-bottom: 0.5rem; border-bottom: 1px solid var(--card-border);">
+                    未完了タスク</h3>
+                <div id="pending-sidebar-list" class="sidebar-list">
+                    <!-- Pending small cards will be injected here -->
+                </div>
+            </aside>
+        </div>
+
+        <!-- Floating Post Form -->
+        <div class="floating-form-container">
+            <section class="form-container compact-form">
+                <div style="display: flex; gap: 15px; align-items: flex-end;">
+                    <div style="flex: 1;">
+                        <input type="text" id="new-title" class="input-field" placeholder="件名..."
+                            style="margin-bottom: 8px; padding: 8px;">
+                        <div style="position: relative;">
+                            <textarea id="new-content" class="input-field" placeholder="内容... @メンション"
+                                style="min-height: 40px; padding: 8px;"></textarea>
+                            <div id="mention-list" class="mention-list" style="bottom: 100%; top: auto; display: none;">
+                            </div>
+                        </div>
+                    </div>
+                    <button id="add-thread-btn" class="btn btn-primary"
+                        style="height: fit-content; padding: 10px 30px;">投稿</button>
                 </div>
             </section>
-            <!-- ... (rest of main remains similar, but we'll inject mention UI in specific places) ... -->
-
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
-                <h2 style="font-size: 1.8rem;">登録済みリスト <span id="task-count"
-                        style="color: var(--primary-light); margin-left: 10px;">0</span></h2>
-                <div style="display: flex; gap: 10px;">
-                    <select id="filter-status" class="input-field" style="width: auto; padding: 5px 15px;">
-                        <option value="all">全て表示</option>
-                        <option value="pending">未完了のみ</option>
-                        <option value="completed">完了済み</option>
-                    </select>
-                </div>
-            </div>
-
-            <div id="thread-list" class="task-grid">
-                <!-- Threads will be injected here -->
-            </div>
-        </main>
+        </div>
     </div>
 
     <!-- Modals -->
