@@ -243,9 +243,21 @@ async function toggleUserTag(profileId, tagId) {
 window.addReaction = async function (threadId, emoji) {
     if (currentProfile.role === 'Viewer') return;
 
-    const existing = allReactions.find(r => r.thread_id === threadId && r.profile_id === currentUser.id && r.emoji === emoji);
-    if (existing) {
-        await supabaseClient.from('reactions').delete().eq('id', existing.id);
+    // --- Optimistic Update ---
+    const existingIndex = allReactions.findIndex(r => r.thread_id === threadId && r.profile_id === currentUser.id && r.emoji === emoji);
+    let tempId = null;
+    if (existingIndex !== -1) {
+        tempId = allReactions[existingIndex].id;
+        allReactions.splice(existingIndex, 1);
+    } else {
+        tempId = 'temp-' + Date.now();
+        allReactions.push({ id: tempId, thread_id: threadId, profile_id: currentUser.id, emoji });
+    }
+    renderThreads();
+    // -------------------------
+
+    if (existingIndex !== -1) {
+        await supabaseClient.from('reactions').delete().eq('id', tempId);
     } else {
         await supabaseClient.from('reactions').insert([{ thread_id: threadId, profile_id: currentUser.id, emoji }]);
     }
@@ -329,8 +341,19 @@ window.toggleStatus = async function (threadId) {
     if (currentProfile.role === 'Viewer') return;
     const thread = threads.find(t => t.id === threadId);
     if (!thread) return;
-    const newStatus = thread.status === 'completed' ? 'pending' : 'completed';
-    await supabaseClient.from('threads').update({ status: newStatus }).eq('id', threadId);
+
+    // --- Optimistic Update ---
+    const originalStatus = thread.status;
+    thread.status = thread.status === 'completed' ? 'pending' : 'completed';
+    renderThreads();
+    // -------------------------
+
+    const { error } = await supabaseClient.from('threads').update({ status: thread.status }).eq('id', threadId);
+    if (error) {
+        thread.status = originalStatus;
+        renderThreads();
+        alert("更新に失敗しました。");
+    }
 }
 
 window.togglePin = async function (threadId) {
@@ -431,12 +454,13 @@ function renderThreads() {
                 </div>
             </div>
 
-            <div class="reply-section">${repliesHtml}
-                ${currentProfile.role !== 'Viewer' ? `
+            <div class="reply-section">
+                <div class="reply-scroll-area">${repliesHtml}</div>
+                ${(currentProfile.role !== 'Viewer' && thread.status !== 'completed') ? `
                 <div class="reply-form">
                     <input type="text" id="reply-input-${thread.id}" class="input-field btn-sm" placeholder="返信...">
                     <button class="btn btn-primary btn-sm" onclick="addReply('${thread.id}')">返信</button>
-                </div>` : ''}
+                </div>` : (thread.status === 'completed' ? '<div style="font-size:0.8rem; color:var(--text-muted); margin-top:10px; text-align:center;">完了済みのスレッドには返信できません</div>' : '')}
             </div>
             <div class="task-footer"><div class="actions">
                 ${currentProfile.role !== 'Viewer' ? `
@@ -449,20 +473,31 @@ function renderThreads() {
         threadListEl.appendChild(card);
     });
 
-    // サイドバーの描画
+    // サイドバーの描画 (拡充版)
     pendingThreads.forEach(thread => {
         const item = document.createElement('div');
         item.className = 'sidebar-item';
+
+        // メンションの抽出
+        const mentions = thread.content.match(/@\S+/g) || [];
+        const uniqueMentions = [...new Set(mentions)].join(' ');
+
         item.innerHTML = `
-            <div style="font-weight: bold; margin-bottom: 4px;">${thread.title}</div>
-            <div style="font-size: 0.75rem; color: var(--text-muted); display: flex; justify-content: space-between;">
-                <span>${thread.author}</span>
+            <div style="font-weight: bold; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${thread.title}</div>
+            <div style="font-size: 0.75rem; color: var(--accent); margin-bottom: 4px;">${uniqueMentions}</div>
+            <div style="font-size: 0.7rem; color: var(--text-muted); display: flex; justify-content: space-between;">
+                <span>by ${thread.author}</span>
                 <span>${new Date(thread.created_at).toLocaleDateString()}</span>
             </div>
         `;
         item.onclick = () => {
             const target = document.getElementById(`thread-${thread.id}`);
-            if (target) target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            if (target) {
+                const headerHeight = 100;
+                const elementPosition = target.getBoundingClientRect().top;
+                const offsetPosition = elementPosition + window.pageYOffset - headerHeight;
+                window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
+            }
         };
         sidebarListEl.appendChild(item);
     });

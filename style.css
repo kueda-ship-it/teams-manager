@@ -261,6 +261,21 @@ header {
     border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
+.reply-scroll-area {
+    max-height: 250px;
+    overflow-y: auto;
+    padding-right: 5px;
+}
+
+.reply-scroll-area::-webkit-scrollbar {
+    width: 4px;
+}
+
+.reply-scroll-area::-webkit-scrollbar-thumb {
+    background: var(--primary-dark);
+    border-radius: 10px;
+}
+
 .reply-item {
     padding: 0.8rem;
     background: rgba(255, 255, 255, 0.03);
@@ -283,6 +298,8 @@ header {
     margin-top: 2rem;
     display: flex;
     gap: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    padding-top: 1rem;
 }
 
 .mention {
