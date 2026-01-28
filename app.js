@@ -179,7 +179,7 @@ function shouldNotify(content) {
 
 function sendStyledNotification(title, body) {
     if (Notification.permission === 'granted') {
-        new Notification(title, { body, icon: 'https://cdn-icons-png.flaticon.com/512/5968/5968534.png' });
+        new Notification(title, { body, icon: 'https://cdn-icons-png.flaticon.com/512/9187/9187604.png' });
     }
 }
 
