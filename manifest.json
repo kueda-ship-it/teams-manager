@@ -1,0 +1,17 @@
+{
+  "name": "連絡概要マネージャー",
+  "short_name": "連絡マネージャー",
+  "description": "リアルタイムで連絡事項を共有・蓄積するタスク管理アプリ",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#0b0c14",
+  "theme_color": "#6264A7",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/5968/5968534.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
