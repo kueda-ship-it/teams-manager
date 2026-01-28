@@ -50,15 +50,15 @@
     <!-- Main Dashboard (Initially Hidden) -->
     <div id="main-dashboard" class="container" style="display: none;">
         <header>
-            <div class="logo">
-                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <div class="logo" style="margin-right: auto;">
+                <svg width="24" height="24" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <rect width="32" height="32" rx="8" fill="var(--accent)" />
                     <path
                         d="M16 8C11.5817 8 8 11.134 8 15C8 17.13 9.1165 19.035 10.875 20.25L10 24L14.25 22.125C14.8125 22.25 15.4062 22.3125 16 22.3125C20.4183 22.3125 24 19.1785 24 15.3125C24 11.4465 20.4183 8.3125 16 8.3125V8Z"
                         fill="white" />
                     <circle cx="16" cy="14" r="3" fill="var(--bg-dark)" />
                 </svg>
-                <span>Contact Team Manager</span>
+                <span style="font-size: 0.95rem;">Contact Team Manager</span>
             </div>
             <div class="user-profile" style="display: flex; align-items: center; gap: 10px;">
                 <button id="admin-btn" class="btn btn-sm"
@@ -130,6 +130,13 @@
             <div class="form-group" style="margin-top: 1rem;">
                 <label>表示名</label>
                 <input type="text" id="pref-display-name" class="input-field" placeholder="名前を入力...">
+            </div>
+            <div class="form-group" style="margin-top: 1rem;">
+                <label>プロフィール画像</label>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <div id="pref-avatar-preview" class="avatar" style="width: 50px; height: 50px;"></div>
+                    <input type="file" id="pref-avatar-input" accept="image/*" style="font-size: 0.8rem;">
+                </div>
             </div>
             <div class="form-group" style="margin-top: 1rem;">
                 <label>通知設定</label>

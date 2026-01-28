@@ -17,6 +17,7 @@ let allProfiles = [];
 let allTags = [];
 let allTagMembers = [];
 let allReactions = [];
+let onlineUsers = new Set();
 
 // --- UI Elements ---
 const authContainer = document.getElementById('auth-container');
@@ -55,6 +56,8 @@ const newTagNameInp = document.getElementById('new-tag-name');
 const addTagBtn = document.getElementById('add-tag-btn');
 
 const mentionListEl = document.getElementById('mention-list');
+const prefAvatarInput = document.getElementById('pref-avatar-input');
+const prefAvatarPreview = document.getElementById('pref-avatar-preview');
 
 // --- Auth & Profile ---
 
@@ -266,6 +269,26 @@ function subscribeToChanges() {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'tags' }, () => loadMasterData())
         .on('postgres_changes', { event: '*', schema: 'public', table: 'tag_members' }, () => loadMasterData())
         .subscribe();
+
+    // --- Presence (Teams-like Active Status) ---
+    const presenceChannel = supabaseClient.channel('online_users', {
+        config: { presence: { key: currentUser.id } }
+    });
+
+    presenceChannel
+        .on('presence', { event: 'sync' }, () => {
+            const state = presenceChannel.presenceState();
+            onlineUsers = new Set(Object.keys(state));
+            renderThreads();
+        })
+        .subscribe(async (status) => {
+            if (status === 'SUBSCRIBED') {
+                await presenceChannel.track({
+                    user_id: currentUser.id,
+                    online_at: new Date().toISOString(),
+                });
+            }
+        });
 }
 
 // --- Main API Actions ---
@@ -351,7 +374,12 @@ function renderThreads() {
 
     // 中央フィードの描画
     feedThreads.forEach(thread => {
+        const authorProfile = allProfiles.find(p => p.email === thread.author || p.display_name === thread.author);
+        const avatarUrl = authorProfile?.avatar_url;
+        const isOnline = authorProfile && onlineUsers.has(authorProfile.id);
+
         const card = document.createElement('div');
+        card.id = `thread-${thread.id}`;
         card.className = `task-card ${thread.is_pinned ? 'is-pinned' : ''} ${thread.status === 'completed' ? 'is-completed' : ''}`;
 
         const reactionsForThread = allReactions.filter(r => r.thread_id === thread.id);
@@ -379,9 +407,14 @@ function renderThreads() {
             ${thread.is_pinned ? '<div class="pinned-badge">重要</div>' : ''}
             <div class="task-header">
                 <div class="user-info">
-                    <div class="avatar">${thread.author[0].toUpperCase()}</div>
+                    <div class="avatar-container">
+                        <div class="avatar">
+                            ${avatarUrl ? `<img src="${avatarUrl}">` : thread.author[0].toUpperCase()}
+                        </div>
+                        <div class="status-dot ${isOnline ? 'active' : ''}"></div>
+                    </div>
                     <div style="flex: 1;">
-                        <div style="font-weight: bold; font-size: 1.1rem;">${thread.title}</div>
+                        <div style="font-weight: bold; font-size: 1rem;">${thread.title}</div>
                         <div class="username">${thread.author} | ${new Date(thread.created_at).toLocaleString()}</div>
                     </div>
                 </div>
@@ -428,14 +461,15 @@ function renderThreads() {
             </div>
         `;
         item.onclick = () => {
-            // クリックしたら該当のフィードにスクロール等（オプション）
+            const target = document.getElementById(`thread-${thread.id}`);
+            if (target) target.scrollIntoView({ behavior: 'smooth', block: 'center' });
         };
         sidebarListEl.appendChild(item);
     });
 }
 
 function highlightMentions(text) {
-    return text.replace(/@\S+/g, match => `<span style="color: var(--accent-light); font-weight: bold; cursor: pointer;">${match}</span>`);
+    return text.replace(/@\S+/g, match => `<span class="mention">${match}</span>`);
 }
 
 function renderAdminUsers() {
@@ -569,15 +603,39 @@ filterStatus.onchange = loadData;
 saveSettingsBtn.onclick = async () => {
     const pref = prefNotification.value;
     const display = prefDisplayName.value.trim();
+    const avatarFile = prefAvatarInput.files[0];
+    let avatarUrl = currentProfile.avatar_url;
+
+    if (avatarFile) {
+        // 本来は Supabase Storage を使うべきですが、今回は簡易的に Base64 に変換します
+        const reader = new FileReader();
+        avatarUrl = await new Promise(resolve => {
+            reader.onload = e => resolve(e.target.result);
+            reader.readAsDataURL(avatarFile);
+        });
+    }
+
     const { error } = await supabaseClient.from('profiles').update({
         notification_preference: pref,
-        display_name: display
+        display_name: display,
+        avatar_url: avatarUrl
     }).eq('id', currentUser.id);
+
     if (!error) {
         currentProfile.notification_preference = pref;
         currentProfile.display_name = display;
+        currentProfile.avatar_url = avatarUrl;
         modalOverlay.style.display = 'none';
         handleAuthState();
+    }
+};
+
+prefAvatarInput.onchange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = e => prefAvatarPreview.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+        reader.readAsDataURL(file);
     }
 };
 

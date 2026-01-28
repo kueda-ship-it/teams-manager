@@ -1,6 +1,5 @@
 :root {
     --primary: #6264A7;
-    /* Teams Purple */
     --primary-light: #8B8CC7;
     --primary-dark: #464775;
     --bg-dark: #11100F;
@@ -18,7 +17,7 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
-    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    font-family: 'Segoe UI', sans-serif;
 }
 
 body {
@@ -28,51 +27,34 @@ body {
     min-height: 100vh;
 }
 
-/* Background Animation */
-body::before {
-    content: '';
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: radial-gradient(circle at 50% 50%, #6264A720 0%, transparent 50%);
-    pointer-events: none;
-    z-index: -1;
-}
-
 .container {
     max-width: 1200px;
     margin: 0 auto;
-    padding: 2rem;
+    padding: 1rem 2rem;
 }
 
 header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 3rem;
-    padding: 1.5rem;
+    margin-bottom: 2rem;
+    padding: 0.8rem 1.5rem;
     background: var(--glass);
-    backdrop-filter: blur(10px);
-    border-radius: 16px;
+    border-radius: 8px;
     border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .logo {
     display: flex;
     align-items: center;
-    gap: 12px;
-    font-size: 1.5rem;
+    gap: 10px;
     font-weight: 700;
-    background: linear-gradient(135deg, var(--text-main) 0%, var(--primary-light) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    color: var(--text-main);
 }
 
 .btn {
     padding: 10px 20px;
-    border-radius: 8px;
+    border-radius: 6px;
     border: none;
     cursor: pointer;
     font-weight: 600;
@@ -87,24 +69,22 @@ header {
 
 .btn-primary:hover {
     background: var(--primary-light);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(98, 100, 167, 0.4);
 }
 
-.task-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-    gap: 20px;
+.btn-sm {
+    padding: 5px 12px;
+    font-size: 0.8rem;
 }
 
+/* --- Task Cards --- */
 .task-card {
     background: var(--card-bg);
-    border-radius: 16px;
-    padding: 1.5rem;
+    border-radius: 8px;
+    padding: 1rem;
     border: 1px solid rgba(255, 255, 255, 0.05);
-    transition: var(--transition);
+    margin-bottom: 15px;
     position: relative;
-    overflow: hidden;
+    overflow: visible;
 }
 
 .task-card::after {
@@ -117,23 +97,48 @@ header {
     background: var(--primary);
 }
 
-.task-card:hover {
-    transform: translateY(-5px);
-    border-color: var(--primary-light);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+.task-card.is-completed {
+    opacity: 0.7;
+}
+
+.task-card.is-completed::after {
+    background: #3498db;
+}
+
+.task-card.is-pinned {
+    border-color: var(--accent);
+    background: linear-gradient(145deg, var(--card-bg), #00B7C308);
+}
+
+.pinned-badge {
+    position: absolute;
+    top: -8px;
+    right: 10px;
+    background: var(--accent);
+    color: var(--bg-dark);
+    padding: 2px 10px;
+    border-radius: 4px;
+    font-size: 0.65rem;
+    font-weight: 800;
+    z-index: 10;
 }
 
 .task-header {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: 1rem;
+    margin-bottom: 0.8rem;
 }
 
 .user-info {
     display: flex;
     align-items: center;
     gap: 10px;
+}
+
+.avatar-container {
+    position: relative;
+    display: inline-block;
 }
 
 .avatar {
@@ -146,22 +151,41 @@ header {
     justify-content: center;
     font-size: 0.8rem;
     font-weight: bold;
+    overflow: hidden;
+    color: white;
+}
+
+.avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.status-dot {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    border: 2px solid var(--card-bg);
+    background: #ccc;
+}
+
+.status-dot.active {
+    background: var(--success);
 }
 
 .username {
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     color: var(--text-muted);
 }
 
 .task-content {
-    font-size: 1rem;
-    line-height: 1.6;
-    margin-bottom: 1.5rem;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    margin-bottom: 1rem;
     color: var(--text-main);
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
 }
 
 .task-footer {
@@ -170,92 +194,60 @@ header {
     align-items: center;
 }
 
-.timestamp {
-    font-size: 0.8rem;
-    color: var(--text-muted);
-}
-
 .actions {
     display: flex;
-    gap: 10px;
+    gap: 8px;
 }
 
-.status-badge {
-    padding: 4px 12px;
-    border-radius: 20px;
-    font-size: 0.75rem;
-    font-weight: 700;
-    text-transform: uppercase;
+/* --- Layout --- */
+.dashboard-layout {
+    display: grid;
+    grid-template-columns: 1fr 300px;
+    gap: 20px;
+    margin-bottom: 120px;
 }
 
-.status-pending {
-    background: rgba(196, 49, 75, 0.2);
-    color: var(--danger);
-}
-
-/* Auth Section */
-#login-overlay {
-    position: fixed;
-    inset: 0;
-    background: var(--bg-dark);
-    z-index: 1000;
+.feed-list {
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
 }
 
-.hero-vibrant {
-    font-size: 4rem;
-    margin-bottom: 1rem;
-    background: linear-gradient(135deg, var(--accent) 0%, var(--primary-light) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+.side-panel {
+    position: sticky;
+    top: 20px;
+    height: fit-content;
 }
 
-.shimmer {
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
-    background-size: 200% 100%;
-    animation: shimmer 2s infinite;
+.sidebar-item {
+    cursor: pointer;
+    padding: 10px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.02);
+    margin-bottom: 8px;
+    transition: 0.2s;
+    font-size: 0.85rem;
 }
 
-/* --- Thread & Form Styles --- */
+.sidebar-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
 
+/* --- Forms & Replies --- */
 .form-container {
     background: var(--card-bg);
-    padding: 2rem;
-    border-radius: 16px;
-    margin-bottom: 2rem;
+    padding: 1.5rem;
+    border-radius: 12px;
     border: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.form-group {
-    margin-bottom: 1rem;
-}
-
-.form-group label {
-    display: block;
-    margin-bottom: 0.5rem;
-    color: var(--text-muted);
-    font-size: 0.8rem;
 }
 
 .input-field {
     width: 100%;
     background: #2D2C2B;
-    /* より不透明な濃いグレー */
     border: 1px solid rgba(255, 255, 255, 0.1);
     color: var(--text-main);
-    padding: 12px;
-    border-radius: 8px;
+    padding: 10px;
+    border-radius: 6px;
     outline: none;
-    transition: var(--transition);
-}
-
-.input-field option {
-    background-color: #2D2C2B;
-    color: white;
 }
 
 .input-field:focus {
@@ -263,68 +255,82 @@ header {
     background: #3D3C3B;
 }
 
-textarea.input-field {
-    min-height: 100px;
-    resize: vertical;
-}
-
 .reply-section {
-    margin-top: 1.5rem;
-    padding-top: 1.5rem;
+    margin-top: 1rem;
+    padding-top: 1rem;
     border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .reply-item {
-    padding: 1rem;
+    padding: 0.8rem;
     background: rgba(255, 255, 255, 0.03);
-    border-radius: 12px;
-    margin-bottom: 0.8rem;
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
     margin-left: 1rem;
     border-left: 2px solid var(--primary-light);
+    font-size: 0.9rem;
 }
 
 .reply-header {
     display: flex;
     justify-content: space-between;
-    font-size: 0.8rem;
-    margin-bottom: 0.5rem;
+    font-size: 0.75rem;
+    margin-bottom: 0.3rem;
     color: var(--text-muted);
 }
 
 .reply-form {
-    margin-top: 1rem;
+    margin-top: 2rem;
     display: flex;
     gap: 10px;
 }
 
-.btn-sm {
-    padding: 6px 12px;
-    font-size: 0.8rem;
+.mention {
+    color: #8B8CC7;
+    font-weight: bold;
+    cursor: pointer;
 }
 
-.pinned-badge {
-    position: absolute;
-    top: -10px;
-    right: 20px;
-    background: var(--accent);
-    color: var(--bg-dark);
-    padding: 4px 12px;
+/* --- Modals & Overlays --- */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+}
+
+.modal {
+    background: var(--card-bg);
+    padding: 2.5rem;
     border-radius: 20px;
-    font-size: 0.7rem;
-    font-weight: 800;
-    box-shadow: 0 4px 10px rgba(0, 183, 195, 0.3);
+    width: 90%;
+    max-width: 800px;
+    max-height: 90vh;
+    overflow-y: auto;
+    position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.task-card.is-pinned {
-    border-color: var(--accent);
-    background: linear-gradient(145deg, var(--card-bg), #00B7C308);
+.floating-form-container {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: calc(100% - 40px);
+    max-width: 800px;
+    z-index: 1000;
 }
 
-.task-card.is-completed {
-    opacity: 0.6;
-    filter: grayscale(0.5);
+.compact-form {
+    padding: 0.8rem 1.2rem !important;
+    background: #252423 !important;
+    border: 1px solid var(--primary) !important;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
 }
 
-.task-card.is-completed::after {
-    background: var(--success);
+html {
+    scroll-behavior: smooth;
 }
